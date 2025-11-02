@@ -500,7 +500,7 @@ st.markdown("""
         margin-top: 0.25rem;
     }
     .custom-upload-label {
-        font-size: 32px;
+        font-size: 30px;
         font-weight: 600;
         color: #000000;
         margin-bottom: 0.25rem;
@@ -559,6 +559,7 @@ if pdf_file is not None:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
         )
+
 
 
 
