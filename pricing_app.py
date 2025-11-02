@@ -474,7 +474,7 @@ if pdf_file is not None:
     # parse PDF
     contract_df = extract_contract_from_pdf(pdf_file)
 
-    st.subheader("🧾 Parsed Contract")
+    st.subheader("🧾 Contracted Products")
     if contract_df.empty:
         st.warning("No contract rows were found under the header. Check the PDF format.")
     else:
@@ -499,7 +499,7 @@ if pdf_file is not None:
             priced_df["Part_Key"].map(mg_subline_map)
         )
 
-        st.subheader("💰 Priced Output (first 100 rows)")
+        st.subheader("Sample Price Sheet: First 100 Rows")
         st.dataframe(priced_df.head(100), use_container_width=True)
 
         # 4) download at bottom
@@ -513,6 +513,7 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a PDF Contract to view contracted categories & download a complete price file.")
+
 
 
 
