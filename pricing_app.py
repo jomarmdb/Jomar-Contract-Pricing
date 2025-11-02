@@ -488,21 +488,35 @@ if list_price_col is None:
     st.error("Could not find a column that contains 'List Price' in the pricing sheet.")
     st.stop()
 
+# big custom label for uploader
 st.markdown("""
     <style>
-    /* Make the uploader label larger and bold */
-    div[data-testid="stFileUploader"] label {
-        font-size: 46px !important;
-        font-weight: 600 !important;
-        color: #000000 !important;
+    /* hide the default uploader label text */
+    div[data-testid="stFileUploader"] > label > div:nth-child(1) {
+        display: none !important;
+    }
+    /* optional: tighten spacing under uploader */
+    div[data-testid="stFileUploader"] {
+        margin-top: 0.25rem;
+    }
+    .custom-upload-label {
+        font-size: 46px;
+        font-weight: 600;
+        color: #000000;
+        margin-bottom: 0.25rem;
     }
     </style>
-    """, unsafe_allow_html=True)
+    """,
+    unsafe_allow_html=True
+)
 
-pdf_file = st.file_uploader("Upload Customer PDF Contract Here:", type=["pdf"])
+st.markdown(
+    '<div class="custom-upload-label">Upload Customer PDF Contract Here:</div>',
+    unsafe_allow_html=True
+)
 
-priced_df = None
-contract_df = None
+# now render uploader with an empty label so we don't get 2 labels
+pdf_file = st.file_uploader("", type=["pdf"])
 
 if pdf_file is not None:
     # parse PDF
@@ -545,6 +559,7 @@ if pdf_file is not None:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
         )
+
 
 
 
