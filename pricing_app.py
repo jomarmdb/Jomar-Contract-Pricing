@@ -410,10 +410,9 @@ if pdf_file is not None:
             priced_df["Sub-Line"] = priced_df["Sub-Line"].fillna(
                 priced_df["Part_Key"].map(mg_subline_map)
             )
-            
+
             st.subheader("💰 Priced Output (first 100 rows)")
             st.dataframe(priced_df.head(100), use_container_width=True)
-    
 
         # 4) download at bottom
         excel_bytes = to_excel_bytes({"Jomar List Pricing (Priced)": priced_df})
@@ -426,6 +425,7 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a contract PDF to see parsed data and download the priced file.")
+
 
 
 
