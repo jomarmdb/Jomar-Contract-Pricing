@@ -11,6 +11,8 @@ from PIL import Image
 # -----------------------------------------------------------
 # CONFIG
 # -----------------------------------------------------------
+st.set_page_config(page_title="Jomar Contract Price Sheet Creator", layout="wide")
+
 st.markdown(
     """
     <style>
@@ -28,8 +30,6 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
-st.set_page_config(page_title="Jomar Contract Price Sheet Creator", layout="wide")
 
 BASE_DIR = Path(__file__).parent
 PRODUCTS_PATH = BASE_DIR / "JomarList_10272025.xlsx"  # make sure name matches
@@ -531,6 +531,7 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a PDF Contract to view contracted categories & download a complete price file.")
+
 
 
 
