@@ -361,8 +361,22 @@ def to_excel_bytes(df_dict: dict[str, pd.DataFrame]) -> bytes:
 # -----------------------------------------------------------
 # UI FLOW
 # -----------------------------------------------------------
-st.title("Jomar Contract Price Sheet Creator")
-st.write("Upload a PDF Contract to Apply Multipliers to a Jomar List Price Excel File.")
+# --- header with title + logo ---
+header_left, header_right = st.columns([3, 1])
+
+with header_left:
+    st.title("Jomar Contract Price Sheet Creator")
+    st.write("Upload a PDF Contract to Apply Multipliers to a Jomar List Price Excel File.")
+
+with header_right:
+    logo_path = BASE_DIR / "Jomar Valve Logo Red.png"
+    if logo_path.exists():
+        logo = Image.open(logo_path)
+        # show it centered in the right column
+        st.image(logo, use_column_width=True)
+    else:
+        # leave empty space so layout still balances
+        st.write("")
 
 # 1) load + prepare workbook (quietly)
 # 1) load + prepare workbook (quietly)
@@ -498,6 +512,7 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a PDF Contract to view contracted categories & download a complete price file.")
+
 
 
 
