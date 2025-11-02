@@ -394,10 +394,14 @@ st.write("📄 Jomar List Pricing columns:", list(flat_list.columns))
 st.write("📄 Model Group columns:", list(model_group.columns))
 
 # 3) merge ON THE NORMALIZED KEY
-flat_merged = flat_list.merge(
-    model_group[["Part_Key", "Sub-Group", "Line", "Sub-Line"]],
-    on="Part_Key",
-    how="left"
+flat_merged = flat_list.copy()
+flat_merged.rename(
+    columns={
+        "Contract Sub-Group": "Sub-Group",
+        "Contract Line": "Line",
+        "Contract Sub-Line": "Sub-Line",
+    },
+    inplace=True,
 )
 
 # 4) (optional) hide the helper key so it doesn’t clutter the download
@@ -452,6 +456,7 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a contract PDF to apply multipliers.")
+
 
 
 
