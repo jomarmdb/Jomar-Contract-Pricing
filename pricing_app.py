@@ -288,8 +288,8 @@ def to_excel_bytes(df_dict: dict[str, pd.DataFrame]) -> bytes:
 # -----------------------------------------------------------
 # UI FLOW
 # -----------------------------------------------------------
-st.title("🧮 Jomar Contract Pricing Applier")
-st.write("Upload a contract PDF and we’ll apply those multipliers to your standard Jomar list pricing workbook.")
+st.title("Jomar Contract Price Sheet Creator")
+st.write("Upload a PDF Contract to Apply Multipliers to a Jomar List Price Excel File.")
 
 # 1) load + prepare workbook (quietly)
 # 1) load + prepare workbook (quietly)
@@ -415,6 +415,7 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a contract PDF to see parsed data and download the priced file.")
+
 
 
 
