@@ -10,7 +10,7 @@ from io import BytesIO
 st.set_page_config(page_title="Jomar Contract Pricing Applier", layout="wide")
 
 # Path to your standardized workbook *inside the repo*
-PRODUCTS_PATH = "Jomar_List10272025.xlsx"   # <-- adjust if needed
+PRODUCTS_PATH = "JomarList_10272025.xlsx"   # <-- adjust if needed
 FLAT_SHEET_NAME = "Jomar List Pricing"
 GROUP_SHEET_NAME = "Model Group"
 
@@ -275,4 +275,5 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a contract PDF to apply multipliers.")
+
 
