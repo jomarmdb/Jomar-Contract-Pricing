@@ -492,7 +492,7 @@ st.markdown("""
     <style>
     /* Make the uploader label larger and bold */
     .stFileUploader label {
-        font-size: 22px !important;
+        font-size: 36px !important;
         font-weight: 600 !important;
         color: #000000 !important; /* optional: change text color */
     }
@@ -507,7 +507,7 @@ if pdf_file is not None:
     # parse PDF
     contract_df = extract_contract_from_pdf(pdf_file)
 
-    st.subheader("🧾 Contracted Products")
+    st.subheader("Contracted Products:")
     if contract_df.empty:
         st.warning("No contract rows were found under the header. Check the PDF format.")
     else:
@@ -546,6 +546,7 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a PDF Contract to view contracted categories & download a complete price file.")
+
 
 
 
