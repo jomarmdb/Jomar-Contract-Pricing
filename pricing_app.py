@@ -121,8 +121,10 @@ def load_product_workbook(path: Path):
       - Model Group
     """
     xls = pd.ExcelFile(path)
-    flat = pd.read_excel(xls, sheet_name=FLAT_SHEET_NAME)
-    model = pd.read_excel(xls, sheet_name=GROUP_SHEET_NAME)
+    xls = pd.ExcelFile(path)
+    # Skip the first 8 rows so pandas treats row 9 as the header row
+    flat = pd.read_excel(xls, sheet_name=FLAT_SHEET_NAME, header=8)
+    model = pd.read_excel(xls, sheet_name=GROUP_SHEET_NAME, header=8)
     return flat, model
 
 
@@ -376,3 +378,4 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a contract PDF to apply multipliers.")
+
