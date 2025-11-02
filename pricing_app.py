@@ -293,25 +293,78 @@ st.write("Upload a contract PDF and we’ll apply those multipliers to your stan
 
 # 1) load + prepare workbook (quietly)
 # 1) load + prepare workbook (quietly)
+# 1) load + prepare workbook (quietly)
 try:
     flat_list, model_group = load_product_workbook(PRODUCTS_PATH)
 except FileNotFoundError:
     st.error(f"Could not find standardized Excel at `{PRODUCTS_PATH}`.")
     st.stop()
 
+# 2) normalize column names
 flat_list = normalize_flat(flat_list)
 model_group = normalize_model(model_group)
 
-# build normalized keys and merge
-flat_list["Part_Key"] = flat_list["Part #"].apply(norm_key)
-model_group["Part_Key"] = model_group["Part #"].apply(norm_key)
+# 3) find the actual part-number column name in BOTH sheets
+def find_part_col(cols):
+    for c in cols:
+        c_clean = str(c).strip().lower()
+        if c_clean in ("part #", "part#", "part number", "part no", "part"):
+            return c
+    return None
+
+flat_part_col = find_part_col(flat_list.columns)
+model_part_col = find_part_col(model_group.columns)
+
+if flat_part_col is None:
+    st.error(f"❌ 'Jomar List Pricing' is missing a part column. Columns: {list(flat_list.columns)}")
+    st.stop()
+
+if model_part_col is None:
+    st.error(f"❌ 'Model Group' is missing a part column. Columns: {list(model_group.columns)}")
+    st.stop()
+
+# 4) build normalized join key on BOTH
+flat_list["Part_Key"] = flat_list[flat_part_col].apply(norm_key)
+model_group["Part_Key"] = model_group[model_part_col].apply(norm_key)
+
+# 5) first merge (what we had before)
 flat_merged = flat_list.merge(
     model_group[["Part_Key", "Sub-Group", "Line", "Sub-Line"]],
     on="Part_Key",
     how="left"
 )
 
-# detect list price col
+# 6) 🟡 BACKFILL from model_group if merge left blanks
+#    (this is the part that fixes your current issue)
+mg_subgroup_map = dict(zip(model_group["Part_Key"], model_group.get("Sub-Group")))
+mg_line_map     = dict(zip(model_group["Part_Key"], model_group.get("Line")))
+mg_subline_map  = dict(zip(model_group["Part_Key"], model_group.get("Sub-Line")))
+
+# fill Sub-Group
+if "Sub-Group" not in flat_merged.columns:
+    flat_merged["Sub-Group"] = flat_merged["Part_Key"].map(mg_subgroup_map)
+else:
+    flat_merged["Sub-Group"] = flat_merged["Sub-Group"].fillna(
+        flat_merged["Part_Key"].map(mg_subgroup_map)
+    )
+
+# fill Line
+if "Line" not in flat_merged.columns:
+    flat_merged["Line"] = flat_merged["Part_Key"].map(mg_line_map)
+else:
+    flat_merged["Line"] = flat_merged["Line"].fillna(
+        flat_merged["Part_Key"].map(mg_line_map)
+    )
+
+# fill Sub-Line
+if "Sub-Line" not in flat_merged.columns:
+    flat_merged["Sub-Line"] = flat_merged["Part_Key"].map(mg_subline_map)
+else:
+    flat_merged["Sub-Line"] = flat_merged["Sub-Line"].fillna(
+        flat_merged["Part_Key"].map(mg_subline_map)
+    )
+
+# 7) detect list-price column (same as before)
 list_price_col = None
 for col in flat_merged.columns:
     if "List Price" in str(col):
@@ -321,6 +374,7 @@ for col in flat_merged.columns:
 if list_price_col is None:
     st.error("Could not find a column that contains 'List Price' in the pricing sheet.")
     st.stop()
+
 
 # 2) PDF uploader (TOP)
 pdf_file = st.file_uploader("📄 Upload contract PDF", type=["pdf"])
@@ -361,6 +415,7 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a contract PDF to see parsed data and download the priced file.")
+
 
 
 
