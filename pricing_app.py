@@ -205,64 +205,87 @@ def apply_contract(
     default_mult: float = 0.50,
     list_price_col: str = "List Price",
 ) -> pd.DataFrame:
-    active = filter_active(contract_df)
+    """
+    Apply contract multipliers and WRITE THEM INTO:
+      - 'Multiplier' (your column E)
+      - 'Net Price' (your column F)
+    We still keep 'Match Source' at the end for auditing.
+    """
+    active = filter_active(contract_df).copy()
 
-    # 1) make sure list price is numeric
+    # build lookup dicts by type (normalized)
+    part_map = {}
+    subline_map = {}
+    subgroup_map = {}
+    line_map = {}
+
+    for _, r in active.iterrows():
+        key = r.get("key_norm")
+        if not key:
+            continue
+        mult = r["multiplier"]
+        if r["key_type"] == "PART":
+            part_map[key] = mult
+        elif r["key_type"] == "SUBLINE":
+            subline_map[key] = mult
+        elif r["key_type"] == "SUBGROUP":
+            subgroup_map[key] = mult
+        elif r["key_type"] == "LINE":
+            line_map[key] = mult
+
+    # make sure list price is numeric
     flat_df[list_price_col] = pd.to_numeric(flat_df[list_price_col], errors="coerce")
 
     multipliers = []
     sources = []
 
     for _, row in flat_df.iterrows():
-        part     = row.get("Part #")
-        subline  = row.get("Sub-Line")
-        subgroup = row.get("Sub-Group")
-        line     = row.get("Line")
+        part     = norm_key(row.get("Part #"))
+        subline  = norm_key(row.get("Sub-Line"))
+        subgroup = norm_key(row.get("Sub-Group"))
+        line     = norm_key(row.get("Line"))
 
-        # 1. PART
-        hit = active[(active["key_type"] == "PART") & (active["key_value"] == part)]
-        if not hit.empty:
-            m = float(hit.iloc[0]["multiplier"])
+        # 1) exact part
+        if part and part in part_map:
+            m = float(part_map[part])
             multipliers.append(m)
             sources.append(f"PART:{part}")
             continue
 
-        # 2. SUB-LINE
-        if pd.notna(subline):
-            hit = active[(active["key_type"] == "SUBLINE") & (active["key_value"] == subline)]
-            if not hit.empty:
-                m = float(hit.iloc[0]["multiplier"])
-                multipliers.append(m)
-                sources.append(f"SUBLINE:{subline}")
-                continue
+        # 2) sub-line
+        if subline and subline in subline_map:
+            m = float(subline_map[subline])
+            multipliers.append(m)
+            sources.append(f"SUBLINE:{subline}")
+            continue
 
-        # 3. SUB-GROUP
-        if pd.notna(subgroup):
-            hit = active[(active["key_type"] == "SUBGROUP") & (active["key_value"] == subgroup)]
-            if not hit.empty:
-                m = float(hit.iloc[0]["multiplier"])
-                multipliers.append(m)
-                sources.append(f"SUBGROUP:{subgroup}")
-                continue
+        # 3) sub-group
+        if subgroup and subgroup in subgroup_map:
+            m = float(subgroup_map[subgroup])
+            multipliers.append(m)
+            sources.append(f"SUBGROUP:{subgroup}")
+            continue
 
-        # 4. LINE
-        if pd.notna(line):
-            hit = active[(active["key_type"] == "LINE") & (active["key_value"] == line)]
-            if not hit.empty:
-                m = float(hit.iloc[0]["multiplier"])
-                multipliers.append(m)
-                sources.append(f"LINE:{line}")
-                continue
+        # 4) line
+        if line and line in line_map:
+            m = float(line_map[line])
+            multipliers.append(m)
+            sources.append(f"LINE:{line}")
+            continue
 
-        # 5. default
+        # 5) default
         multipliers.append(default_mult)
         sources.append("DEFAULT:0.50")
 
-    flat_df["Contract Multiplier"] = multipliers
+    # 👇 write into your existing columns
+    flat_df["Multiplier"] = multipliers
+    flat_df["Net Price"] = flat_df[list_price_col] * flat_df["Multiplier"]
+
+    # keep this for audit (goes to the right)
     flat_df["Match Source"] = sources
-    flat_df["Contract Net Price"] = flat_df[list_price_col] * flat_df["Contract Multiplier"]
 
     return flat_df
+
 
 def to_excel_bytes(df_dict: dict[str, pd.DataFrame]) -> bytes:
     output = BytesIO()
@@ -365,3 +388,4 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a contract PDF to apply multipliers.")
+
