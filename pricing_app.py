@@ -3,14 +3,21 @@ import pandas as pd
 import pdfplumber
 from datetime import date
 from io import BytesIO
+from pathlib import Path
 
 # -----------------------------------------------------------
 # CONFIG
 # -----------------------------------------------------------
 st.set_page_config(page_title="Jomar Contract Pricing Applier", layout="wide")
 
+# base directory of this script
+BASE_DIR = Path(__file__).parent
+
 # Path to your standardized workbook *inside the repo*
-PRODUCTS_PATH = "JomarList_10272025.xlsx"   # <-- adjust if needed
+# put the file next to this script, or adjust to BASE_DIR / "data" / ...
+PRODUCTS_PATH = BASE_DIR / "JomarList_10272025.xlsx"   # <-- change to your exact filename
+
+# Sheet names inside that workbook
 FLAT_SHEET_NAME = "Jomar List Pricing"
 GROUP_SHEET_NAME = "Model Group"
 
@@ -27,14 +34,90 @@ CODE_MAP = {
 }
 
 # -----------------------------------------------------------
-# HELPERS
+# HELPER FUNCTIONS
 # -----------------------------------------------------------
+
+def normalize_cols(df: pd.DataFrame) -> pd.DataFrame:
+    """Strip whitespace from column names."""
+    df = df.copy()
+    df.columns = df.columns.str.strip()
+    return df
+
+
+def normalize_flat(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Make sure the pricing sheet (Jomar List Pricing) has:
+      - Part #
+      - List Price
+    even if the user called them Part#, Part Number, List, etc.
+    """
+    df = normalize_cols(df)
+    rename_map = {}
+
+    # Part #
+    if "Part #" not in df.columns:
+        if "Part#" in df.columns:
+            rename_map["Part#"] = "Part #"
+        elif "Part Number" in df.columns:
+            rename_map["Part Number"] = "Part #"
+        elif "Part No" in df.columns:
+            rename_map["Part No"] = "Part #"
+
+    # List Price
+    if "List Price" not in df.columns:
+        if "List" in df.columns:
+            rename_map["List"] = "List Price"
+        elif "Price" in df.columns:
+            rename_map["Price"] = "List Price"
+
+    return df.rename(columns=rename_map)
+
+
+def normalize_model(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Make sure the Model Group sheet has:
+      - Part #
+      - Sub-Group
+      - Line
+      - Sub-Line
+
+    and ignore "Model #" and "Group", since you said those
+    are just leftover / not used for contracting.
+    """
+    df = normalize_cols(df)
+    rename_map = {}
+
+    # Part #
+    if "Part #" not in df.columns and "Part#" in df.columns:
+        rename_map["Part#"] = "Part #"
+
+    # Sub-Group variants
+    if "Sub-Group" not in df.columns:
+        if "Sub Group" in df.columns:
+            rename_map["Sub Group"] = "Sub-Group"
+        elif "Subgroup" in df.columns:
+            rename_map["Subgroup"] = "Sub-Group"
+
+    # Sub-Line variants
+    if "Sub-Line" not in df.columns:
+        if "Sub Line" in df.columns:
+            rename_map["Sub Line"] = "Sub-Line"
+        elif "Subline" in df.columns:
+            rename_map["Subline"] = "Sub-Line"
+
+    # Line variants (common: stray space)
+    if "Line" not in df.columns and "Line " in df.columns:
+        rename_map["Line "] = "Line"
+
+    return df.rename(columns=rename_map)
+
+
 @st.cache_data
-def load_product_workbook(path: str):
+def load_product_workbook(path: Path):
     """
     Load the standardized Excel from the repo.
     Must contain:
-      - Flat List
+      - Jomar List Pricing
       - Model Group
     """
     xls = pd.ExcelFile(path)
@@ -45,10 +128,10 @@ def load_product_workbook(path: str):
 
 def extract_contract_from_pdf(pdf_file) -> pd.DataFrame:
     """
-    Read a PDF like the sample you shared and return ONLY the rows under
+    Read a PDF like the sample and return ONLY the rows under
     the header:
       Product / Group / Line | Code | Start Date | End Date | Price / Multi
-    We ignore all the branch / header text above it.
+    We ignore all the customer/branch stuff at the top.
     """
     rows = []
     with pdfplumber.open(pdf_file) as pdf:
@@ -57,33 +140,31 @@ def extract_contract_from_pdf(pdf_file) -> pd.DataFrame:
             for table in tables:
                 keep = False
                 for r in table:
-                    # r is a list of cells
+                    # normalize each cell
                     cells = [(c.strip() if isinstance(c, str) else c) for c in r]
                     if not any(cells):
                         continue
 
-                    # detect header row
+                    # detect header
                     if cells[0] and HEADER_MARKER in cells[0]:
                         keep = True
                         continue
 
-                    # after header we start capturing rows
+                    # only capture rows after header
                     if keep:
                         rows.append(cells)
 
     if not rows:
-        # return empty in the normalized shape
+        # return empty in normalized shape
         return pd.DataFrame(
             columns=["key_value", "key_type", "start_date", "end_date", "multiplier"]
         )
 
-    # your PDF had 6 columns (the 6th is that trailing X)
-    # but if a page is a bit off, we'll pad
+    # some pages might have 5 cols, some 6 -> normalize
     max_len = max(len(r) for r in rows)
     norm_rows = [r + [None] * (max_len - len(r)) for r in rows]
 
-    # try to build with the expected columns
-    # we'll name the first 6 like this; extra cols get dropped
+    # expected columns (your PDF had 6, last was an X)
     col_names = [
         "Product / Group / Line",
         "Code",
@@ -95,7 +176,7 @@ def extract_contract_from_pdf(pdf_file) -> pd.DataFrame:
 
     df_raw = pd.DataFrame(norm_rows, columns=col_names)
 
-    # normalize column names to what we use later
+    # normalize column names to our internal schema
     df = df_raw.rename(
         columns={
             "Product / Group / Line": "key_value",
@@ -225,25 +306,45 @@ def to_excel_bytes(df_dict: dict[str, pd.DataFrame]) -> bytes:
 st.title("Jomar Contract Pricing Applier")
 
 st.write(
-    "This app uses a **standard Excel** from the repo. "
-    "Upload a customer's **contract PDF** and we'll apply multipliers to the standard list."
+    "This app uses your **standardized Excel** in the repo "
+    f"(`{PRODUCTS_PATH.name}`) and applies multipliers from a customer PDF. "
+    "Priority: **Part → Sub-Line → Sub-Group → Line → 0.50**."
 )
 
 # load standard workbook
 try:
     flat_list, model_group = load_product_workbook(PRODUCTS_PATH)
 except FileNotFoundError:
-    st.error(f"⚠️ Could not find standardized Excel at `{PRODUCTS_PATH}`. Make sure it's in the repo.")
+    st.error(f"⚠️ Could not find standardized Excel at `{PRODUCTS_PATH}`.")
     st.stop()
 
-# merge model info onto flat list so each part knows its Sub-Group / Line / Sub-Line
+# normalize column names on BOTH sheets
+flat_list = normalize_flat(flat_list)
+model_group = normalize_model(model_group)
+
+# show what we actually have (super helpful while setting up)
+st.write("📄 Jomar List Pricing columns:", list(flat_list.columns))
+st.write("📄 Model Group columns:", list(model_group.columns))
+
+# make sure required columns are there
+needed_model_cols = ["Part #", "Sub-Group", "Line", "Sub-Line"]
+missing = [c for c in needed_model_cols if c not in model_group.columns]
+if missing:
+    st.error(f"Model Group sheet is missing these columns: {missing}")
+    st.stop()
+
+if "Part #" not in flat_list.columns:
+    st.error("Pricing sheet is missing 'Part #' column.")
+    st.stop()
+
+# now it's safe to merge
 flat_merged = flat_list.merge(
     model_group[["Part #", "Sub-Group", "Line", "Sub-Line"]],
     on="Part #",
     how="left"
 )
 
-st.subheader("📦 Standard product master (preview)")
+st.subheader("📦 Standard product master (merged preview)")
 st.dataframe(flat_merged.head(25))
 
 # file uploader for contract PDF
@@ -266,14 +367,12 @@ if pdf_file is not None:
         st.dataframe(priced_df.head(100))
 
         # 3) let user download the priced Excel
-        excel_bytes = to_excel_bytes({"Jomar List Pricing": priced_df})
+        excel_bytes = to_excel_bytes({"Jomar List Pricing (Priced)": priced_df})
         st.download_button(
             label="⬇️ Download priced Excel",
             data=excel_bytes,
-            file_name="priced_flat_list.xlsx",
+            file_name="priced_jomar_list.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 else:
     st.info("Upload a contract PDF to apply multipliers.")
-
-
