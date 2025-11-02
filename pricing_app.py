@@ -491,13 +491,14 @@ if list_price_col is None:
 st.markdown("""
     <style>
     /* Make the uploader label larger and bold */
-    .stFileUploader label {
+    div[data-testid="stFileUploader"] label {
         font-size: 40px !important;
         font-weight: 600 !important;
-        color: #000000 !important; /* optional: change text color */
+        color: #000000 !important;
     }
     </style>
     """, unsafe_allow_html=True)
+
 pdf_file = st.file_uploader("Upload Customer PDF Contract Here:", type=["pdf"])
 
 priced_df = None
@@ -546,6 +547,7 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a PDF Contract to view contracted categories & download a complete price file.")
+
 
 
 
