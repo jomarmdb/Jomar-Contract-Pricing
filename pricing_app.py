@@ -14,7 +14,7 @@ BASE_DIR = Path(__file__).parent
 PRODUCTS_PATH = BASE_DIR / "JomarList_10272025.xlsx"  # make sure name matches
 FLAT_SHEET_NAME = "Jomar List Pricing"
 GROUP_SHEET_NAME = "Model Group"
-HEADER_ROW_INDEX = 8  # headers start on row 9 in Excel
+HEADER_ROW_INDEX = 0  # headers start on row 1 in Excel
 
 CODE_MAP = {
     "P": "PART",
@@ -360,3 +360,4 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a contract PDF to see parsed data and download the priced file.")
+
