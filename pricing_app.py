@@ -4,6 +4,8 @@ import pdfplumber
 from datetime import date
 from io import BytesIO
 from pathlib import Path
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 
 # -----------------------------------------------------------
 # CONFIG
@@ -277,13 +279,64 @@ def apply_contract(
     return flat_df
 
 
+from openpyxl.styles import Font, PatternFill, Alignment
+from openpyxl.utils import get_column_letter
+
 def to_excel_bytes(df_dict: dict[str, pd.DataFrame]) -> bytes:
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         for sheet_name, df in df_dict.items():
+            # write dataframe first
             df.to_excel(writer, sheet_name=sheet_name, index=False)
-    output.seek(0)
-    return output.getvalue()
+
+            # get the worksheet
+            ws = writer.sheets[sheet_name]
+
+            # 1) freeze header row
+            ws.freeze_panes = "A2"
+
+            # 2) style header row (Jomar red)
+            jomar_red = "BC141B"
+            header_fill = PatternFill(start_color=jomar_red, end_color=jomar_red, fill_type="solid")
+            header_font = Font(bold=True, italic=True, color="FFFFFF")
+            header_alignment = Alignment(vertical="center")
+
+            for col_idx, col_name in enumerate(df.columns, start=1):
+                cell = ws.cell(row=1, column=col_idx)
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.alignment = header_alignment
+
+            # 3) sensible column widths
+            col_widths = {
+                "A": 16,  # Part #
+                "B": 16,  # Model #
+                "C": 12,  # Size
+                "D": 14,  # List Price
+                "E": 12,  # Multiplier
+                "F": 14,  # Net Price
+                "G": 10,  # Case Qty
+                "H": 11,  # Carton Qty
+                "I": 10,  # Weight
+                "J": 18,  # UPC
+                "K": 45,  # Part Description
+                "L": 20,  # Sub-Group
+                "M": 18,  # Line
+                "N": 18,  # Sub-Line
+                "O": 26,  # Match Source
+            }
+
+            for col_letter, width in col_widths.items():
+                ws.column_dimensions[col_letter].width = width
+
+            # 4) formats
+            max_row = ws.max_row
+            cols_by_name = {name: idx + 1 for idx, name in enumerate(df.columns)}
+
+            # currency for list/net price
+            for price_col in ("List Price", "Net Price"):
+                if price_col i_
+
 
 # -----------------------------------------------------------
 # UI FLOW
@@ -425,6 +478,7 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a PDF Contract to view contracted categories & download a complete price file.")
+
 
 
 
