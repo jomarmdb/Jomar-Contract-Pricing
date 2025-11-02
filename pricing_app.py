@@ -292,6 +292,7 @@ st.title("🧮 Jomar Contract Pricing Applier")
 st.write("Upload a contract PDF and we’ll apply those multipliers to your standard Jomar list pricing workbook.")
 
 # 1) load + prepare workbook (quietly)
+# 1) load + prepare workbook (quietly)
 try:
     flat_list, model_group = load_product_workbook(PRODUCTS_PATH)
 except FileNotFoundError:
@@ -360,4 +361,5 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a contract PDF to see parsed data and download the priced file.")
+
 
