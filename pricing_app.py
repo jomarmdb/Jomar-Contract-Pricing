@@ -16,7 +16,7 @@ st.set_page_config(page_title="Jomar Contract Price Sheet Creator", layout="wide
 st.markdown("""
 <style>
 h1 {
-    font-size: 44px !important;
+    font-size: 54px !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -538,6 +538,7 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a PDF Contract to view contracted categories & download a complete price file.")
+
 
 
 
