@@ -539,7 +539,7 @@ if pdf_file is not None:
         # 4) download at bottom
         excel_bytes = to_excel_bytes({"Jomar List Pricing (Priced)": priced_df})
         st.download_button(
-            label="⬇️ Download Excel Net Sheet",
+            label="Download Excel Net Sheet",
             data=excel_bytes,
             file_name="priced_jomar_list.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -547,6 +547,7 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a PDF Contract to view contracted categories & download a complete price file.")
+
 
 
 
