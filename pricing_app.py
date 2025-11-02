@@ -216,7 +216,8 @@ def filter_active(contract_df: pd.DataFrame, as_of: date | None = None) -> pd.Da
 def apply_contract(flat_df: pd.DataFrame, contract_df: pd.DataFrame, default_mult: float = 0.50) -> pd.DataFrame:
     active = filter_active(contract_df)
 
-    flat_df["10/27/2025 List Price"] = pd.to_numeric(flat_df["10/27/2025 List Price"], errors="coerce")
+    # Convert 'List Price' column to numeric
+    flat_df["List Price"] = pd.to_numeric(flat_df["List Price"], errors="coerce")
 
     multipliers = []
     sources = []
@@ -271,6 +272,7 @@ def apply_contract(flat_df: pd.DataFrame, contract_df: pd.DataFrame, default_mul
     flat_df["Contract Net Price"] = flat_df["List Price"] * flat_df["Contract Multiplier"]
 
     return flat_df
+
 
 def to_excel_bytes(df_dict: dict[str, pd.DataFrame]) -> bytes:
     output = BytesIO()
@@ -355,6 +357,7 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a contract PDF to apply multipliers.")
+
 
 
 
