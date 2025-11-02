@@ -13,6 +13,24 @@ from PIL import Image
 # -----------------------------------------------------------
 st.set_page_config(page_title="Jomar Contract Price Sheet Creator", layout="wide")
 
+st.markdown(
+    """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap');
+
+    html, body, [class*="css"]  {
+        font-family: 'Montserrat', sans-serif;
+    }
+
+    h1, h2, h3 {
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 600;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 BASE_DIR = Path(__file__).parent
 PRODUCTS_PATH = BASE_DIR / "JomarList_10272025.xlsx"  # make sure name matches
 FLAT_SHEET_NAME = "Jomar List Pricing"
@@ -513,6 +531,7 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a PDF Contract to view contracted categories & download a complete price file.")
+
 
 
 
