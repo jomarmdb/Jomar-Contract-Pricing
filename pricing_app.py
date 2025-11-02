@@ -114,7 +114,7 @@ def load_product_workbook(path: Path):
     """
     xls = pd.ExcelFile(path)
     flat = pd.read_excel(xls, sheet_name=FLAT_SHEET_NAME, header=HEADER_ROW_INDEX)
-    model = pd.read_excel(xls, sheet_name=GROUP_SHEET_NAME, header=HEADER_ROW_INDEX)
+    model = pd.read_excel(xls, sheet_name=GROUP_SHEET_NAME, header=0)
     return flat, model
 
 # -----------------------------------------------------------
@@ -355,3 +355,4 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a contract PDF to apply multipliers.")
+
