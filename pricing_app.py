@@ -498,8 +498,6 @@ st.markdown("""
     }
     </style>
     """, unsafe_allow_html=True)
-
-# 2) PDF uploader (TOP)
 pdf_file = st.file_uploader("Upload Customer PDF Contract Here:", type=["pdf"])
 
 priced_df = None
@@ -548,6 +546,7 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a PDF Contract to view contracted categories & download a complete price file.")
+
 
 
 
