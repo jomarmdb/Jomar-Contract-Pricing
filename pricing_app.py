@@ -21,9 +21,6 @@ GROUP_SHEET_NAME = "Model Group"
 # your Excel headers start on row 9 (1-based) -> header=8 (0-based)
 HEADER_ROW_INDEX = 8
 
-# PDF header text we look for (but we will detect it by words now)
-HEADER_MARKER = "Product"
-
 # PDF code → our internal type
 CODE_MAP = {
     "P": "PART",
@@ -61,12 +58,17 @@ def normalize_flat(df: pd.DataFrame) -> pd.DataFrame:
         elif "Part No" in df.columns:
             rename_map["Part No"] = "Part #"
 
-    # list price variants
+    # list price variants (this is just a safety net)
     if "List Price" not in df.columns:
-        if "List" in df.columns:
-            rename_map["List"] = "List Price"
-        elif "Price" in df.columns:
-            rename_map["Price"] = "List Price"
+        for col in df.columns:
+            if "List Price" in str(col):
+                rename_map[col] = "List Price"
+                break
+        else:
+            if "List" in df.columns:
+                rename_map["List"] = "List Price"
+            elif "Price" in df.columns:
+                rename_map["Price"] = "List Price"
 
     return df.rename(columns=rename_map)
 
@@ -110,7 +112,8 @@ def normalize_model(df: pd.DataFrame) -> pd.DataFrame:
 def load_product_workbook(path: Path):
     """
     Load your standardized workbook.
-    We read both sheets using header=8 because your titles start on row 9.
+    Pricing sheet: header row is 9 → header=8
+    Model sheet: looks like your columns start right away → header=0
     """
     xls = pd.ExcelFile(path)
     flat = pd.read_excel(xls, sheet_name=FLAT_SHEET_NAME, header=HEADER_ROW_INDEX)
@@ -118,23 +121,15 @@ def load_product_workbook(path: Path):
     return flat, model
 
 # -----------------------------------------------------------
-# PDF PARSER (word-based for your actual PDF)
+# PDF PARSER (word-based)
 # -----------------------------------------------------------
 
 def extract_contract_from_pdf(pdf_file) -> pd.DataFrame:
-    """
-    Your PDF doesn't expose nice tables, so we:
-      1. read words by line,
-      2. wait until we see a line with 'Product', 'Group', 'Line',
-      3. then treat every line below as a data row, split by x position.
-    We keep only rows where Code is in {P,U,S,L,G}.
-    """
     rows = []
 
     with pdfplumber.open(pdf_file) as pdf:
         for page in pdf.pages:
             words = page.extract_words()
-            # group words by (rounded) vertical position
             line_dict = {}
             for w in words:
                 top = round(w["top"])
@@ -147,21 +142,13 @@ def extract_contract_from_pdf(pdf_file) -> pd.DataFrame:
                 ws = sorted(line_dict[top], key=lambda x: x["x0"])
                 texts = [w["text"] for w in ws]
 
-                # detect the header row (it is split over several rows, but we key off the line that has Product / Group / Line)
+                # detect the header-ish line
                 if not header_seen:
                     if ("Product" in texts and "Group" in texts and "Line" in texts):
                         header_seen = True
-                    # keep scanning until we see the header
                     continue
 
-                # after header: parse rows based on x positions
-                # columns in your PDF (based on your sample):
-                # product: x0 < 200
-                # code:    200-250
-                # start:   250-305
-                # end:     300-370
-                # multi:   370-425
-
+                # after header: slice by x0 ranges (approx from your sample)
                 product_parts = [w["text"] for w in ws if w["x0"] < 200]
                 code_parts    = [w["text"] for w in ws if 200 <= w["x0"] < 250]
                 start_parts   = [w["text"] for w in ws if 250 <= w["x0"] < 305]
@@ -177,7 +164,6 @@ def extract_contract_from_pdf(pdf_file) -> pd.DataFrame:
                 end     = end_parts[0] if end_parts else ""
                 multi   = multi_parts[0] if multi_parts else ""
 
-                # only keep real contract rows
                 if code not in ("P", "U", "S", "L", "G"):
                     continue
 
@@ -213,11 +199,16 @@ def filter_active(contract_df: pd.DataFrame, as_of: date | None = None) -> pd.Da
 
     return contract_df[contract_df.apply(_active, axis=1)]
 
-def apply_contract(flat_df: pd.DataFrame, contract_df: pd.DataFrame, default_mult: float = 0.50) -> pd.DataFrame:
+def apply_contract(
+    flat_df: pd.DataFrame,
+    contract_df: pd.DataFrame,
+    default_mult: float = 0.50,
+    list_price_col: str = "List Price",
+) -> pd.DataFrame:
     active = filter_active(contract_df)
 
-    # Convert 'List Price' column to numeric
-    flat_df["List Price"] = pd.to_numeric(flat_df["List Price"], errors="coerce")
+    # 1) make sure list price is numeric
+    flat_df[list_price_col] = pd.to_numeric(flat_df[list_price_col], errors="coerce")
 
     multipliers = []
     sources = []
@@ -269,10 +260,9 @@ def apply_contract(flat_df: pd.DataFrame, contract_df: pd.DataFrame, default_mul
 
     flat_df["Contract Multiplier"] = multipliers
     flat_df["Match Source"] = sources
-    flat_df["Contract Net Price"] = flat_df["List Price"] * flat_df["Contract Multiplier"]
+    flat_df["Contract Net Price"] = flat_df[list_price_col] * flat_df["Contract Multiplier"]
 
     return flat_df
-
 
 def to_excel_bytes(df_dict: dict[str, pd.DataFrame]) -> bytes:
     output = BytesIO()
@@ -327,6 +317,19 @@ flat_merged = flat_list.merge(
     how="left"
 )
 
+# 🔎 detect the actual list-price column name AFTER merge
+list_price_col = None
+for col in flat_merged.columns:
+    if "List Price" in str(col):
+        list_price_col = col
+        break
+
+st.write("🔎 Detected list-price column (post-merge):", list_price_col)
+
+if list_price_col is None:
+    st.error("Could not find a column that contains 'List Price' in the merged pricing sheet.")
+    st.stop()
+
 st.subheader("📦 Standard product master (merged preview)")
 st.dataframe(flat_merged.head(25))
 
@@ -342,7 +345,12 @@ if pdf_file is not None:
     if contract_df.empty:
         st.warning("No contract rows were found under the header. Check the PDF format.")
     else:
-        priced_df = apply_contract(flat_merged.copy(), contract_df, default_mult=0.50)
+        priced_df = apply_contract(
+            flat_merged.copy(),
+            contract_df,
+            default_mult=0.50,
+            list_price_col=list_price_col,   # 👈 use detected name
+        )
 
         st.subheader("💰 Priced output (first 100 rows)")
         st.dataframe(priced_df.head(100))
@@ -357,7 +365,3 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a contract PDF to apply multipliers.")
-
-
-
-
