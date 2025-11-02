@@ -11,7 +11,7 @@ from PIL import Image
 # -----------------------------------------------------------
 # CONFIG
 # -----------------------------------------------------------
-st.set_page_config(page_title="JOMAR CONTRACT PRICE SHEET CREATOR", layout="wide")
+st.set_page_config(page_title="Jomar Price Sheet Creator", layout="wide")
 
 st.markdown("""
 <style>
@@ -392,7 +392,7 @@ def to_excel_bytes(df_dict: dict[str, pd.DataFrame]) -> bytes:
 header_left, header_right = st.columns([3, 1])
 
 with header_left:
-    st.title("Jomar Contract Price Sheet Creator")
+    st.title("JOMAR CONTRACT PRICE SHEET CREATOR")
 
 with header_right:
     logo_path = BASE_DIR / "Jomar Valve Logo Red.png"
@@ -559,6 +559,7 @@ if pdf_file is not None:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
         )
+
 
 
 
