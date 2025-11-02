@@ -492,7 +492,7 @@ st.markdown("""
     <style>
     /* Make the uploader label larger and bold */
     div[data-testid="stFileUploader"] label {
-        font-size: 40px !important;
+        font-size: 46px !important;
         font-weight: 600 !important;
         color: #000000 !important;
     }
@@ -545,6 +545,7 @@ if pdf_file is not None:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
         )
+
 
 
 
