@@ -121,4 +121,237 @@ def load_product_workbook(path: Path):
 # PDF PARSER (word-based for your actual PDF)
 # -----------------------------------------------------------
 
-def extract_contr_
+def extract_contract_from_pdf(pdf_file) -> pd.DataFrame:
+    """
+    Your PDF doesn't expose nice tables, so we:
+      1. read words by line,
+      2. wait until we see a line with 'Product', 'Group', 'Line',
+      3. then treat every line below as a data row, split by x position.
+    We keep only rows where Code is in {P,U,S,L,G}.
+    """
+    rows = []
+
+    with pdfplumber.open(pdf_file) as pdf:
+        for page in pdf.pages:
+            words = page.extract_words()
+            # group words by (rounded) vertical position
+            line_dict = {}
+            for w in words:
+                top = round(w["top"])
+                line_dict.setdefault(top, []).append(w)
+
+            sorted_tops = sorted(line_dict.keys())
+            header_seen = False
+
+            for top in sorted_tops:
+                ws = sorted(line_dict[top], key=lambda x: x["x0"])
+                texts = [w["text"] for w in ws]
+
+                # detect the header row (it is split over several rows, but we key off the line that has Product / Group / Line)
+                if not header_seen:
+                    if ("Product" in texts and "Group" in texts and "Line" in texts):
+                        header_seen = True
+                    # keep scanning until we see the header
+                    continue
+
+                # after header: parse rows based on x positions
+                # columns in your PDF (based on your sample):
+                # product: x0 < 200
+                # code:    200-250
+                # start:   250-305
+                # end:     300-370
+                # multi:   370-425
+
+                product_parts = [w["text"] for w in ws if w["x0"] < 200]
+                code_parts    = [w["text"] for w in ws if 200 <= w["x0"] < 250]
+                start_parts   = [w["text"] for w in ws if 250 <= w["x0"] < 305]
+                end_parts     = [w["text"] for w in ws if 300 <= w["x0"] < 370]
+                multi_parts   = [w["text"] for w in ws if 370 <= w["x0"] < 430]
+
+                if not product_parts:
+                    continue
+
+                product = " ".join(product_parts).strip()
+                code    = code_parts[0] if code_parts else ""
+                start   = start_parts[0] if start_parts else ""
+                end     = end_parts[0] if end_parts else ""
+                multi   = multi_parts[0] if multi_parts else ""
+
+                # only keep real contract rows
+                if code not in ("P", "U", "S", "L", "G"):
+                    continue
+
+                rows.append((product, code, start, end, multi))
+
+    if not rows:
+        return pd.DataFrame(
+            columns=["key_value", "key_type", "start_date", "end_date", "multiplier"]
+        )
+
+    df = pd.DataFrame(rows, columns=["key_value", "code", "start_date", "end_date", "multiplier"])
+    df["key_type"] = df["code"].map(CODE_MAP)
+    df = df[df["key_type"].notna()]
+
+    df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce")
+    df["end_date"]   = pd.to_datetime(df["end_date"], errors="coerce")
+    df["multiplier"] = pd.to_numeric(df["multiplier"], errors="coerce")
+
+    return df[["key_value", "key_type", "start_date", "end_date", "multiplier"]]
+
+# -----------------------------------------------------------
+# PRICING LOGIC
+# -----------------------------------------------------------
+
+def filter_active(contract_df: pd.DataFrame, as_of: date | None = None) -> pd.DataFrame:
+    if as_of is None:
+        as_of = date.today()
+
+    def _active(r):
+        start_ok = pd.isna(r["start_date"]) or (r["start_date"].date() <= as_of)
+        end_ok = pd.isna(r["end_date"]) or (r["end_date"].date() >= as_of)
+        return start_ok and end_ok
+
+    return contract_df[contract_df.apply(_active, axis=1)]
+
+def apply_contract(flat_df: pd.DataFrame, contract_df: pd.DataFrame, default_mult: float = 0.50) -> pd.DataFrame:
+    active = filter_active(contract_df)
+
+    flat_df["List Price"] = pd.to_numeric(flat_df["List Price"], errors="coerce")
+
+    multipliers = []
+    sources = []
+
+    for _, row in flat_df.iterrows():
+        part     = row.get("Part #")
+        subline  = row.get("Sub-Line")
+        subgroup = row.get("Sub-Group")
+        line     = row.get("Line")
+
+        # 1. PART
+        hit = active[(active["key_type"] == "PART") & (active["key_value"] == part)]
+        if not hit.empty:
+            m = float(hit.iloc[0]["multiplier"])
+            multipliers.append(m)
+            sources.append(f"PART:{part}")
+            continue
+
+        # 2. SUB-LINE
+        if pd.notna(subline):
+            hit = active[(active["key_type"] == "SUBLINE") & (active["key_value"] == subline)]
+            if not hit.empty:
+                m = float(hit.iloc[0]["multiplier"])
+                multipliers.append(m)
+                sources.append(f"SUBLINE:{subline}")
+                continue
+
+        # 3. SUB-GROUP
+        if pd.notna(subgroup):
+            hit = active[(active["key_type"] == "SUBGROUP") & (active["key_value"] == subgroup)]
+            if not hit.empty:
+                m = float(hit.iloc[0]["multiplier"])
+                multipliers.append(m)
+                sources.append(f"SUBGROUP:{subgroup}")
+                continue
+
+        # 4. LINE
+        if pd.notna(line):
+            hit = active[(active["key_type"] == "LINE") & (active["key_value"] == line)]
+            if not hit.empty:
+                m = float(hit.iloc[0]["multiplier"])
+                multipliers.append(m)
+                sources.append(f"LINE:{line}")
+                continue
+
+        # 5. default
+        multipliers.append(default_mult)
+        sources.append("DEFAULT:0.50")
+
+    flat_df["Contract Multiplier"] = multipliers
+    flat_df["Match Source"] = sources
+    flat_df["Contract Net Price"] = flat_df["List Price"] * flat_df["Contract Multiplier"]
+
+    return flat_df
+
+def to_excel_bytes(df_dict: dict[str, pd.DataFrame]) -> bytes:
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        for sheet_name, df in df_dict.items():
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
+    output.seek(0)
+    return output.getvalue()
+
+# -----------------------------------------------------------
+# UI
+# -----------------------------------------------------------
+
+st.title("Jomar Contract Pricing Applier")
+
+st.write(
+    "This app loads your **standardized Excel** (headers on row 9), "
+    "parses the contract PDF you upload, and applies multipliers in the order: "
+    "**Part → Sub-Line → Sub-Group → Line → 0.50**."
+)
+
+# load workbook
+try:
+    flat_list, model_group = load_product_workbook(PRODUCTS_PATH)
+except FileNotFoundError:
+    st.error(f"⚠️ Could not find standardized Excel at `{PRODUCTS_PATH}`.")
+    st.stop()
+
+# normalize columns
+flat_list = normalize_flat(flat_list)
+model_group = normalize_model(model_group)
+
+# show for debugging
+st.write("📄 Jomar List Pricing columns:", list(flat_list.columns))
+st.write("📄 Model Group columns:", list(model_group.columns))
+
+# check required columns
+needed_model_cols = ["Part #", "Sub-Group", "Line", "Sub-Line"]
+missing = [c for c in needed_model_cols if c not in model_group.columns]
+if missing:
+    st.error(f"'Model Group' sheet is missing these columns: {missing}")
+    st.stop()
+
+if "Part #" not in flat_list.columns:
+    st.error("'Jomar List Pricing' sheet is missing 'Part #' column.")
+    st.stop()
+
+# merge model columns onto pricing
+flat_merged = flat_list.merge(
+    model_group[["Part #", "Sub-Group", "Line", "Sub-Line"]],
+    on="Part #",
+    how="left"
+)
+
+st.subheader("📦 Standard product master (merged preview)")
+st.dataframe(flat_merged.head(25))
+
+# upload contract PDF
+pdf_file = st.file_uploader("📄 Upload contract PDF", type=["pdf"])
+
+if pdf_file is not None:
+    contract_df = extract_contract_from_pdf(pdf_file)
+
+    st.subheader("🧾 Parsed contract rows")
+    st.dataframe(contract_df)
+
+    if contract_df.empty:
+        st.warning("No contract rows were found under the header. Check the PDF format.")
+    else:
+        priced_df = apply_contract(flat_merged.copy(), contract_df, default_mult=0.50)
+
+        st.subheader("💰 Priced output (first 100 rows)")
+        st.dataframe(priced_df.head(100))
+
+        excel_bytes = to_excel_bytes({"Jomar List Pricing (Priced)": priced_df})
+
+        st.download_button(
+            label="⬇️ Download priced Excel",
+            data=excel_bytes,
+            file_name="priced_jomar_list.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+else:
+    st.info("Upload a contract PDF to apply multipliers.")
