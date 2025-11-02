@@ -349,6 +349,12 @@ def to_excel_bytes(df_dict: dict[str, pd.DataFrame]) -> bytes:
                 for row in range(2, max_row + 1):
                     ws.cell(row=row, column=col_idx).number_format = "0.0000"
 
+            # UPC codes as whole numbers (no decimals)
+            if "M" in ws.column_dimensions:  # column M = UPC in your current layout
+                col_idx = 13  # M = 13th column
+                for row in range(2, max_row + 1):
+                    ws.cell(row=row, column=col_idx).number_format = "0"
+
     output.seek(0)
     return output.getvalue()
 
@@ -492,6 +498,7 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a PDF Contract to view contracted categories & download a complete price file.")
+
 
 
 
