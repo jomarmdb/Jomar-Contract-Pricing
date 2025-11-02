@@ -212,12 +212,31 @@ def extract_contract_from_pdf(pdf_file) -> pd.DataFrame:
 # -----------------------------------------------------------
 
 def filter_active(contract_df: pd.DataFrame, as_of: date | None = None) -> pd.DataFrame:
+    """
+    Keep only rows that are 'active' as of today.
+
+    Special rule for your PDFs:
+    - If End Date is something ancient (year < 2000, e.g. 12/31/1949),
+      we will treat it as 'no end date' / still active.
+    """
     if as_of is None:
         as_of = date.today()
 
     def _active(r):
+        # start check
         start_ok = pd.isna(r["start_date"]) or (r["start_date"].date() <= as_of)
-        end_ok = pd.isna(r["end_date"]) or (r["end_date"].date() >= as_of)
+
+        # end check
+        if pd.isna(r["end_date"]):
+            end_ok = True
+        else:
+            end_year = r["end_date"].year
+            if end_year < 2000:
+                # <-- THIS is the important part for your 12/31/1949 rows
+                end_ok = True
+            else:
+                end_ok = r["end_date"].date() >= as_of
+
         return start_ok and end_ok
 
     return contract_df[contract_df.apply(_active, axis=1)]
@@ -410,6 +429,7 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a contract PDF to apply multipliers.")
+
 
 
 
