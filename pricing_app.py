@@ -324,7 +324,7 @@ def to_excel_bytes(df_dict: dict[str, pd.DataFrame]) -> bytes:
                 "J": 10,  # Case
                 "K": 10,  # Carton
                 "L": 20,  # Weight
-                "M": 13,  # UPC
+                "M": 14,  # UPC
                 "N": 118,  # Description
                 "O": 26,  # Match Source
             }
@@ -498,6 +498,7 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a PDF Contract to view contracted categories & download a complete price file.")
+
 
 
 
