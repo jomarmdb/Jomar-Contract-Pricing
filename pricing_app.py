@@ -465,7 +465,7 @@ if list_price_col is None:
 
 
 # 2) PDF uploader (TOP)
-pdf_file = st.file_uploader("📄 Upload contract PDF", type=["pdf"])
+pdf_file = st.file_uploader("📄 Upload Customer PDF Contract", type=["pdf"])
 
 priced_df = None
 contract_df = None
@@ -513,6 +513,7 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a PDF Contract to view contracted categories & download a complete price file.")
+
 
 
 
