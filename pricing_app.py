@@ -108,6 +108,26 @@ def normalize_model(df: pd.DataFrame) -> pd.DataFrame:
 
     return df.rename(columns=rename_map)
 
+    def norm_key(val):
+    """
+    Normalize strings so PDF keys and Excel keys can match.
+    - turn to string
+    - strip spaces
+    - uppercase
+    - normalize weird dashes and quotes
+    """
+    if pd.isna(val):
+        return None
+    s = str(val).strip()
+    if not s:
+        return None
+    s = (s
+         .replace("–", "-")
+         .replace("—", "-")
+         .replace("-", "-")   # non-breaking hyphen
+         .replace("’", "'"))
+    return s.upper()
+
 @st.cache_data
 def load_product_workbook(path: Path):
     """
@@ -119,6 +139,7 @@ def load_product_workbook(path: Path):
     flat = pd.read_excel(xls, sheet_name=FLAT_SHEET_NAME, header=HEADER_ROW_INDEX)
     model = pd.read_excel(xls, sheet_name=GROUP_SHEET_NAME, header=0)
     return flat, model
+    
 
 # -----------------------------------------------------------
 # PDF PARSER (word-based)
@@ -388,4 +409,5 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a contract PDF to apply multipliers.")
+
 
