@@ -313,19 +313,19 @@ def to_excel_bytes(df_dict: dict[str, pd.DataFrame]) -> bytes:
             # 3) sensible column widths
             col_widths = {
                 "A": 16,  # Part #
-                "B": 16,  # Model #
-                "C": 12,  # Size
-                "D": 14,  # List Price
-                "E": 12,  # Multiplier
-                "F": 14,  # Net Price
-                "G": 10,  # Case Qty
-                "H": 11,  # Carton Qty
-                "I": 10,  # Weight
-                "J": 18,  # UPC
-                "K": 45,  # Part Description
-                "L": 20,  # Sub-Group
-                "M": 18,  # Line
-                "N": 18,  # Sub-Line
+                "B": 20,  # Model #
+                "C": 10,  # Size
+                "D": 20,  # Sub-Group
+                "E": 20,  # Line
+                "F": 20,  # Sub-Line
+                "G": 10,  # List Price
+                "H": 10,  # Multiplier
+                "I": 10,  # Net Price
+                "J": 10,  # Case
+                "K": 10,  # Carton
+                "L": 20,  # Weight
+                "M": 13,  # UPC
+                "N": 118,  # Description
                 "O": 26,  # Match Source
             }
 
@@ -492,6 +492,7 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a PDF Contract to view contracted categories & download a complete price file.")
+
 
 
 
