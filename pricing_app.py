@@ -385,7 +385,7 @@ header_left, header_right = st.columns([3, 1])
 
 with header_left:
     st.title("Jomar Contract Price Sheet Creator")
-    st.subheader("Upload a PDF Contract to Apply Multipliers to a Jomar List Price Excel File.")
+    st.markdown("Upload a PDF Contract to Apply Multipliers to a Jomar List Price Excel File.")
 
 with header_right:
     logo_path = BASE_DIR / "Jomar Valve Logo Red.png"
@@ -531,6 +531,7 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a PDF Contract to view contracted categories & download a complete price file.")
+
 
 
 
