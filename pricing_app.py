@@ -6,6 +6,7 @@ from io import BytesIO
 from pathlib import Path
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+from PIL import Image
 
 # -----------------------------------------------------------
 # CONFIG
@@ -512,6 +513,7 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a PDF Contract to view contracted categories & download a complete price file.")
+
 
 
 
