@@ -374,12 +374,35 @@ if "Part #" not in flat_list.columns:
     st.error("'Jomar List Pricing' sheet is missing 'Part #' column.")
     st.stop()
 
-# merge model columns onto pricing
+# load workbook
+try:
+    flat_list, model_group = load_product_workbook(PRODUCTS_PATH)
+except FileNotFoundError:
+    st.error(f"⚠️ Could not find standardized Excel at `{PRODUCTS_PATH}`.")
+    st.stop()
+
+# 1) normalize column names on BOTH sheets
+flat_list = normalize_flat(flat_list)
+model_group = normalize_model(model_group)
+
+# 2) make normalized join key on BOTH
+flat_list["Part_Key"] = flat_list["Part #"].apply(norm_key)
+model_group["Part_Key"] = model_group["Part #"].apply(norm_key)
+
+# (optional) show for debugging
+st.write("📄 Jomar List Pricing columns:", list(flat_list.columns))
+st.write("📄 Model Group columns:", list(model_group.columns))
+
+# 3) merge ON THE NORMALIZED KEY
 flat_merged = flat_list.merge(
-    model_group[["Part #", "Sub-Group", "Line", "Sub-Line"]],
-    on="Part #",
+    model_group[["Part_Key", "Sub-Group", "Line", "Sub-Line"]],
+    on="Part_Key",
     how="left"
 )
+
+# 4) (optional) hide the helper key so it doesn’t clutter the download
+# flat_merged = flat_merged.drop(columns=["Part_Key"])
+
 
 # 🔎 detect the actual list-price column name AFTER merge
 list_price_col = None
@@ -429,6 +452,7 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a contract PDF to apply multipliers.")
+
 
 
 
