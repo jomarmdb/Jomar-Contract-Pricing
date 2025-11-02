@@ -8,7 +8,7 @@ from pathlib import Path
 # -----------------------------------------------------------
 # CONFIG
 # -----------------------------------------------------------
-st.set_page_config(page_title="Jomar Contract Pricing Applier", layout="wide")
+st.set_page_config(page_title="Jomar Contract Price Sheet Creator", layout="wide")
 
 BASE_DIR = Path(__file__).parent
 PRODUCTS_PATH = BASE_DIR / "JomarList_10272025.xlsx"  # make sure name matches
@@ -415,6 +415,7 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a contract PDF to see parsed data and download the priced file.")
+
 
 
 
