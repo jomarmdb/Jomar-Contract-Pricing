@@ -545,8 +545,8 @@ if pdf_file is not None:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
         )
-else:
-    st.info("Upload a PDF Contract to view contracted categories & download a complete price file.")
+
+
 
 
 
