@@ -299,10 +299,10 @@ def to_excel_bytes(df_dict: dict[str, pd.DataFrame]) -> bytes:
             ws.freeze_panes = "A2"
 
             # 2) style header row (Jomar red)
-            jomar_red = "BC141B"
+            jomar_red = "FFFFFF"
             header_fill = PatternFill(start_color=jomar_red, end_color=jomar_red, fill_type="solid")
-            header_font = Font(bold=False, italic=True, color="FFFFFF")
-            header_alignment = Alignment(vertical="center")
+            header_font = Font(bold=False, italic=True, color="000000")
+            header_alignment = Alignment(vertical="Center")
 
             for col_idx, col_name in enumerate(df.columns, start=1):
                 cell = ws.cell(row=1, column=col_idx)
@@ -498,6 +498,7 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a PDF Contract to view contracted categories & download a complete price file.")
+
 
 
 
