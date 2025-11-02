@@ -16,7 +16,7 @@ st.set_page_config(page_title="Jomar Contract Price Sheet Creator", layout="wide
 st.markdown("""
 <style>
 h1 {
-    font-size: 54px !important;
+    font-size: 50px !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -559,6 +559,7 @@ if pdf_file is not None:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
         )
+
 
 
 
