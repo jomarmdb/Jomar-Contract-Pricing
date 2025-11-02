@@ -282,6 +282,9 @@ def apply_contract(
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
 
+from openpyxl.styles import Font, PatternFill, Alignment
+from openpyxl.utils import get_column_letter
+
 def to_excel_bytes(df_dict: dict[str, pd.DataFrame]) -> bytes:
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
@@ -335,8 +338,19 @@ def to_excel_bytes(df_dict: dict[str, pd.DataFrame]) -> bytes:
 
             # currency for list/net price
             for price_col in ("List Price", "Net Price"):
-                if price_col i_
+                if price_col in cols_by_name:
+                    col_idx = cols_by_name[price_col]
+                    for row in range(2, max_row + 1):
+                        ws.cell(row=row, column=col_idx).number_format = "$#,##0.00"
 
+            # multiplier with 4 decimals
+            if "Multiplier" in cols_by_name:
+                col_idx = cols_by_name["Multiplier"]
+                for row in range(2, max_row + 1):
+                    ws.cell(row=row, column=col_idx).number_format = "0.0000"
+
+    output.seek(0)
+    return output.getvalue()
 
 # -----------------------------------------------------------
 # UI FLOW
@@ -478,6 +492,7 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a PDF Contract to view contracted categories & download a complete price file.")
+
 
 
 
