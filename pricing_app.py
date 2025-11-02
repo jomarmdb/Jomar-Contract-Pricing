@@ -34,6 +34,26 @@ CODE_MAP = {
 # HELPER FUNCTIONS (Excel)
 # -----------------------------------------------------------
 
+def norm_key(val):
+    """
+    Normalize strings so PDF keys and Excel keys can match.
+    - turn to string
+    - strip spaces
+    - uppercase
+    - normalize weird dashes and quotes
+    """
+    if pd.isna(val):
+        return None
+    s = str(val).strip()
+    if not s:
+        return None
+    s = (s
+         .replace("–", "-")
+         .replace("—", "-")
+         .replace("-", "-")   # non-breaking hyphen
+         .replace("’", "'"))
+    return s.upper()
+
 def normalize_cols(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df.columns = df.columns.str.strip()
@@ -107,26 +127,6 @@ def normalize_model(df: pd.DataFrame) -> pd.DataFrame:
         rename_map["Line "] = "Line"
 
     return df.rename(columns=rename_map)
-
-    def norm_key(val):
-    """
-    Normalize strings so PDF keys and Excel keys can match.
-    - turn to string
-    - strip spaces
-    - uppercase
-    - normalize weird dashes and quotes
-    """
-    if pd.isna(val):
-        return None
-    s = str(val).strip()
-    if not s:
-        return None
-    s = (s
-         .replace("–", "-")
-         .replace("—", "-")
-         .replace("-", "-")   # non-breaking hyphen
-         .replace("’", "'"))
-    return s.upper()
 
 @st.cache_data
 def load_product_workbook(path: Path):
@@ -203,7 +203,9 @@ def extract_contract_from_pdf(pdf_file) -> pd.DataFrame:
     df["end_date"]   = pd.to_datetime(df["end_date"], errors="coerce")
     df["multiplier"] = pd.to_numeric(df["multiplier"], errors="coerce")
 
-    return df[["key_value", "key_type", "start_date", "end_date", "multiplier"]]
+    df["key_norm"] = df["key_value"].apply(norm_key)
+    return df[["key_value", "key_type", "start_date", "end_date", "multiplier", "key_norm"]]
+
 
 # -----------------------------------------------------------
 # PRICING LOGIC
@@ -226,12 +228,6 @@ def apply_contract(
     default_mult: float = 0.50,
     list_price_col: str = "List Price",
 ) -> pd.DataFrame:
-    """
-    Apply contract multipliers and WRITE THEM INTO:
-      - 'Multiplier' (your column E)
-      - 'Net Price' (your column F)
-    We still keep 'Match Source' at the end for auditing.
-    """
     active = filter_active(contract_df).copy()
 
     # build lookup dicts by type (normalized)
@@ -253,6 +249,12 @@ def apply_contract(
             subgroup_map[key] = mult
         elif r["key_type"] == "LINE":
             line_map[key] = mult
+
+    # make sure target columns exist
+    if "Multiplier" not in flat_df.columns:
+        flat_df["Multiplier"] = None
+    if "Net Price" not in flat_df.columns:
+        flat_df["Net Price"] = None
 
     # make sure list price is numeric
     flat_df[list_price_col] = pd.to_numeric(flat_df[list_price_col], errors="coerce")
@@ -298,15 +300,14 @@ def apply_contract(
         multipliers.append(default_mult)
         sources.append("DEFAULT:0.50")
 
-    # 👇 write into your existing columns
+    # write into your existing columns
     flat_df["Multiplier"] = multipliers
     flat_df["Net Price"] = flat_df[list_price_col] * flat_df["Multiplier"]
 
-    # keep this for audit (goes to the right)
+    # keep audit
     flat_df["Match Source"] = sources
 
     return flat_df
-
 
 def to_excel_bytes(df_dict: dict[str, pd.DataFrame]) -> bytes:
     output = BytesIO()
@@ -409,5 +410,6 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a contract PDF to apply multipliers.")
+
 
 
