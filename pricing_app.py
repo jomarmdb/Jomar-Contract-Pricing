@@ -294,6 +294,7 @@ def to_excel_bytes(df_dict: dict[str, pd.DataFrame]) -> bytes:
 
             # get the worksheet
             ws = writer.sheets[sheet_name]
+            ws.sheet_view.showGridLines = False
 
             # 1) freeze header row
             ws.freeze_panes = "A2"
@@ -497,6 +498,7 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a PDF Contract to view contracted categories & download a complete price file.")
+
 
 
 
