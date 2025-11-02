@@ -488,6 +488,16 @@ if list_price_col is None:
     st.error("Could not find a column that contains 'List Price' in the pricing sheet.")
     st.stop()
 
+st.markdown("""
+    <style>
+    /* Make the uploader label larger and bold */
+    .stFileUploader label {
+        font-size: 22px !important;
+        font-weight: 600 !important;
+        color: #000000 !important; /* optional: change text color */
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 # 2) PDF uploader (TOP)
 pdf_file = st.file_uploader("Upload Customer PDF Contract Here:", type=["pdf"])
@@ -538,6 +548,7 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a PDF Contract to view contracted categories & download a complete price file.")
+
 
 
 
