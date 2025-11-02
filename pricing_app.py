@@ -492,7 +492,7 @@ st.markdown("""
     <style>
     /* Make the uploader label larger and bold */
     .stFileUploader label {
-        font-size: 36px !important;
+        font-size: 40px !important;
         font-weight: 600 !important;
         color: #000000 !important; /* optional: change text color */
     }
@@ -546,6 +546,7 @@ if pdf_file is not None:
         )
 else:
     st.info("Upload a PDF Contract to view contracted categories & download a complete price file.")
+
 
 
 
