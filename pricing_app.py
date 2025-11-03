@@ -363,7 +363,7 @@ def to_excel_bytes(
 					cell.font = Font(bold=False, italic=True, color="000000")
 
 				# underline area in C2:D7 via bottom border
-				underline = Border(bottom=Side(style="dotted", color="000000"))
+				underline = Border(bottom=Side(style="dotted", color="A6A6A6"))
 				for row in range(2, 8):   # rows 2..7 inclusive
 					for col in ("C", "D"):
 						ws[f"{col}{row}"].border = underline
@@ -619,4 +619,5 @@ if pdf_file is not None:
 			file_name="priced_jomar_list.xlsx",
 			mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 		)
+
 
