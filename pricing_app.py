@@ -576,35 +576,25 @@ if list_price_col is None:
 	st.error("Could not find a column that contains 'List Price' in the pricing sheet.")
 	st.stop()
 
-# big custom label for uploader
+# --- Custom file uploader styling to match subheader look ---
+# --- File uploader section (clean and consistent style) ---
+st.subheader("Upload Customer PDF Contract:")
+
+# File uploader directly below the subheader
 st.markdown("""
-	<style>
-	/* hide the default uploader label text */
-	div[data-testid="stFileUploader"] > label > div:nth-child(1) {
-		display: none !important;
-	}
-	/* optional: tighten spacing under uploader */
-	div[data-testid="stFileUploader"] {
-		margin-top: 0.25rem;
-	}
-	.custom-upload-label {
-		font-size: 24px;
-		font-weight: 550;
-		color: #000000;
-		margin-bottom: 0.25rem;
-	}
-	</style>
-	""",
-	unsafe_allow_html=True
-)
+    <style>
+    div[data-testid="stFileUploader"] {
+        margin-top: -0.75rem !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
-st.markdown(
-	'<div class="custom-upload-label">UPLOAD CUSTOMER PDF CONTRACT:</div>',
-	unsafe_allow_html=True
+pdf_file = st.file_uploader(
+    "Upload Customer PDF Contract",
+    type=["pdf"],
+    key="contract_pdf_uploader",
+    label_visibility="collapsed"  # hides the duplicate gray label under subheader
 )
-
-# now render uploader with an empty label so we don't get 2 labels
-pdf_file = st.file_uploader("", type=["pdf"])
 
 if pdf_file is not None:
 	# parse PDF
@@ -648,7 +638,7 @@ if pdf_file is not None:
 		st.download_button(
 			label="⬇️ Download Excel Net Sheet",
 			data=excel_bytes,
-			file_name="priced_jomar_list.xlsx",
+			file_name="Jomar List & Net Price Sheet.xlsx",
 			mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 		)
 
