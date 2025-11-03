@@ -15,6 +15,38 @@ st.set_page_config(page_title="Jomar Price Sheet Creator", layout="wide")
 
 st.markdown("""
 <style>
+@font-face {
+    font-family: 'Proxima Nova';
+    src: url('Proxima Nova Font.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+}
+
+/* Optional bold/italic faces if you have them later:
+@font-face {
+    font-family: 'Proxima Nova';
+    src: url('Proxima Nova Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+}
+*/
+
+/* Apply Proxima Nova globally */
+html, body, [class*="st-"], [data-testid="stAppViewContainer"] * {
+    font-family: 'Proxima Nova', 'Segoe UI', system-ui, -apple-system, sans-serif !important;
+}
+
+/* Optional: Title and headers a little heavier */
+h1, h2, h3 {
+    font-family: 'Proxima Nova', 'Segoe UI', system-ui, -apple-system, sans-serif !important;
+    font-weight: 600 !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+
+st.markdown("""
+<style>
 h1 {
 	font-size: 54px !important;
 }
@@ -363,7 +395,7 @@ def to_excel_bytes(
 					cell.font = Font(bold=False, italic=True, color="000000")
 
 				# underline area in C2:D7 via bottom border
-				underline = Border(bottom=Side(style="dotted", color="A6A6A6"))
+				underline = Border(bottom=Side(style="dotted", color="000000"))
 				for row in range(2, 8):   # rows 2..7 inclusive
 					for col in ("C", "D"):
 						ws[f"{col}{row}"].border = underline
@@ -556,8 +588,8 @@ st.markdown("""
 		margin-top: 0.25rem;
 	}
 	.custom-upload-label {
-		font-size: 25px;
-		font-weight: 600;
+		font-size: 24px;
+		font-weight: 550;
 		color: #000000;
 		margin-bottom: 0.25rem;
 	}
@@ -567,7 +599,7 @@ st.markdown("""
 )
 
 st.markdown(
-	'<div class="custom-upload-label">Upload Customer PDF Contract Here:</div>',
+	'<div class="custom-upload-label">UPLOAD CUSTOMER PDF CONTRACT:</div>',
 	unsafe_allow_html=True
 )
 
@@ -619,5 +651,4 @@ if pdf_file is not None:
 			file_name="priced_jomar_list.xlsx",
 			mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 		)
-
 
