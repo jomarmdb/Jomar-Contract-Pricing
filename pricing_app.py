@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import pdfplumber
+import re
 from datetime import date
 from io import BytesIO
 from pathlib import Path
@@ -168,70 +169,169 @@ def load_product_workbook(path: Path):
 	model = pd.read_excel(xls, sheet_name=GROUP_SHEET_NAME, header=0)
 	return flat, model
 
-
 def extract_contract_from_pdf(pdf_file) -> pd.DataFrame:
-	rows = []
-	with pdfplumber.open(pdf_file) as pdf:
-		for page in pdf.pages:
-			words = page.extract_words()
-			line_dict = {}
-			for w in words:
-				top = round(w["top"])
-				line_dict.setdefault(top, []).append(w)
+    """
+    ETNA-tuned parser:
+      • If a page has a header, parse BOTH (a) valid rows ABOVE the header and (b) all valid rows BELOW it.
+      • If a page has no header (but a header was seen earlier), begin at the first plausible data row and parse downward.
+      • Strong validation: requires valid Code (P/U/S/L/G), 2 date-like fields, multiplier 0–1, and product text.
+      • Skips page headers/footers and ignores the trailing 'X' checkbox column.
+    Returns: [key_value, key_type, start_date, end_date, multiplier, key_norm]
+    """
+    import re
+    rows = []
+    header_seen_globally = False
 
-			sorted_tops = sorted(line_dict.keys())
-			header_seen = False
+    # === Column bands (x0) tuned to ETNA layout ===
+    # Product ~ x≈80–190; Code ~ x≈208; Start ~ x≈252; End ~ x≈302; Multi ~ x≈374 (then 'X' at ~421)
+    X_PRODUCT_MAX = 200
+    X_CODE_MIN,  X_CODE_MAX  = 200, 245
+    X_START_MIN, X_START_MAX = 245, 300
+    X_END_MIN,   X_END_MAX   = 300, 360
+    X_MULTI_MIN, X_MULTI_MAX = 360, 420   # stop before the trailing "X" (~421)
 
-			for top in sorted_tops:
-				ws = sorted(line_dict[top], key=lambda x: x["x0"])
-				texts = [w["text"] for w in ws]
+    def is_date_like(s: str) -> bool:
+        if not s:
+            return False
+        s = s.strip()
+        # Accept M/D/YY or M/D/YYYY (and MM/DD variants)
+        return re.match(r"^\d{1,2}/\d{1,2}/\d{2,4}$", s) is not None
 
-				if not header_seen:
-					if ("Product" in texts and "Group" in texts and "Line" in texts):
-						header_seen = True
-					continue
+    def normalize_code(raw: str) -> str:
+        if not raw:
+            return ""
+        keep = "".join(ch for ch in raw.upper() if ch.isalpha())
+        for ch in keep:
+            if ch in ("P", "U", "S", "L", "G"):
+                return ch
+        return ""
 
-				product_parts = [w["text"] for w in ws if w["x0"] < 200]
-				code_parts    = [w["text"] for w in ws if 200 <= w["x0"] < 250]
-				start_parts   = [w["text"] for w in ws if 250 <= w["x0"] < 305]
-				end_parts     = [w["text"] for w in ws if 300 <= w["x0"] < 370]
-				multi_parts   = [w["text"] for w in ws if 370 <= w["x0"] < 430]
+    def parse_multiplier(raw: str):
+        if raw is None:
+            return None
+        s = str(raw).strip().replace(",", ".").replace("O", "0").replace("o", "0")
+        if s.startswith("."):
+            s = "0" + s
+        try:
+            val = float(s)
+            return val if 0 < val <= 1.0 else None
+        except Exception:
+            return None
 
-				if not product_parts:
-					continue
+    def extract_row_from_words(ws):
+        """Return (product, code, start, end, mult) if this line matches bands/validations; else None."""
+        product_parts = [w["text"] for w in ws if w["x0"] < X_PRODUCT_MAX]
+        code_parts    = [w["text"] for w in ws if X_CODE_MIN  <= w["x0"] < X_CODE_MAX]
+        start_parts   = [w["text"] for w in ws if X_START_MIN <= w["x0"] < X_START_MAX]
+        end_parts     = [w["text"] for w in ws if X_END_MIN   <= w["x0"] < X_END_MAX]
+        multi_parts   = [w["text"] for w in ws if X_MULTI_MIN <= w["x0"] < X_MULTI_MAX]
 
-				product = " ".join(product_parts).strip()
-				code    = code_parts[0] if code_parts else ""
-				start   = start_parts[0] if start_parts else ""
-				end     = end_parts[0] if end_parts else ""
-				multi   = multi_parts[0] if multi_parts else ""
+        if not product_parts:
+            return None
 
-				if code not in ("P", "U", "S", "L", "G"):
-					continue
+        product = " ".join(product_parts).strip()
+        code    = normalize_code(code_parts[0] if code_parts else "")
+        start   = start_parts[0] if start_parts else ""
+        end     = end_parts[0]   if end_parts   else ""
+        mult    = parse_multiplier(multi_parts[0] if multi_parts else None)
 
-				rows.append((product, code, start, end, multi))
+        # Keep only strong matches
+        if code in ("P", "U", "S", "L", "G") and is_date_like(start) and is_date_like(end) and mult is not None:
+            return (product, code, start, end, mult)
+        return None
 
-	if not rows:
-		return pd.DataFrame(
-			columns=["key_value", "key_type", "start_date", "end_date", "multiplier", "key_norm"]
-		)
+    with pdfplumber.open(pdf_file) as pdf:
+        for page in pdf.pages:
+            words = page.extract_words() or []
+            # Group words by line (rounded y 'top')
+            line_dict = {}
+            for w in words:
+                top = round(w["top"])
+                line_dict.setdefault(top, []).append(w)
 
-	df = pd.DataFrame(
-		rows,
-		columns=["key_value", "code", "start_date", "end_date", "multiplier"]
-	)
-	df["key_type"] = df["code"].map(CODE_MAP)
-	df = df[df["key_type"].notna()]
+            # --- 1) Find header on this page (if present) and record y cutoff
+            page_header_top = None
+            for top in sorted(line_dict.keys()):
+                ws = sorted(line_dict[top], key=lambda x: x["x0"])
+                joined = " ".join(w["text"] for w in ws).lower()
+                looks_like_header = (
+                    ("product" in joined and "group" in joined and "line" in joined)
+                    or ("code" in joined and "start" in joined and "end" in joined and ("multi" in joined or "price" in joined))
+                )
+                if looks_like_header:
+                    page_header_top = top
+                    header_seen_globally = True
+                    break
 
-	df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce")
-	df["end_date"]   = pd.to_datetime(df["end_date"], errors="coerce")
-	df["multiplier"] = pd.to_numeric(df["multiplier"], errors="coerce")
+            # --- 2) If a header exists on this page: parse *above the header* for carryover rows
+            if page_header_top is not None:
+                for top in sorted(line_dict.keys()):
+                    if top >= page_header_top:
+                        break  # stop at header
+                    ws = sorted(line_dict[top], key=lambda x: x["x0"])
+                    # Skip boilerplate at very top like location lines
+                    low_line = " ".join(w["text"] for w in ws).lower()
+                    if (
+                        low_line.startswith("page ")
+                        or "jomar valve" in low_line
+                        or "customer price sheet assignment" in low_line
+                    ):
+                        continue
+                    extracted = extract_row_from_words(ws)
+                    if extracted:
+                        rows.append(extracted)
 
-	# normalized key from PDF
-	df["key_norm"] = df["key_value"].apply(norm_key)
+            # --- 3) If no header here but we've seen one globally, find first plausible data row and start there
+            page_cutoff_top = None
+            if page_header_top is None and header_seen_globally:
+                for top in sorted(line_dict.keys()):
+                    ws = sorted(line_dict[top], key=lambda x: x["x0"])
+                    extracted = extract_row_from_words(ws)
+                    if extracted:
+                        page_cutoff_top = top - 1  # begin parsing from here downward
+                        break
 
-	return df[["key_value", "key_type", "start_date", "end_date", "multiplier", "key_norm"]]
+            # If neither header nor cutoff and no header yet globally, skip this page
+            if page_header_top is None and page_cutoff_top is None and not header_seen_globally:
+                continue
 
+            # --- 4) Parse rows *below* the header or cutoff
+            for top in sorted(line_dict.keys()):
+                # enforce starting point
+                if page_header_top is not None and top <= page_header_top:
+                    continue
+                if page_header_top is None and page_cutoff_top is not None and top <= page_cutoff_top:
+                    continue
+
+                ws = sorted(line_dict[top], key=lambda x: x["x0"])
+                low_line = " ".join(w["text"] for w in ws).lower()
+
+                # Skip obvious headers/footers and boilerplate
+                if (
+                    low_line.startswith("page ")
+                    or "jomar valve" in low_line
+                    or "customer price sheet assignment" in low_line
+                ):
+                    continue
+
+                extracted = extract_row_from_words(ws)
+                if extracted:
+                    rows.append(extracted)
+
+    # --- Build DataFrame in your app’s expected shape
+    if not rows:
+        return pd.DataFrame(columns=["key_value", "key_type", "start_date", "end_date", "multiplier", "key_norm"])
+
+    df = pd.DataFrame(rows, columns=["key_value", "code", "start_date", "end_date", "multiplier"])
+    df["key_type"] = df["code"].map(CODE_MAP)
+    df = df[df["key_type"].notna()]
+
+    df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce")
+    df["end_date"]   = pd.to_datetime(df["end_date"], errors="coerce")
+    df["multiplier"] = pd.to_numeric(df["multiplier"], errors="coerce")
+
+    df["key_norm"] = df["key_value"].apply(norm_key)
+    return df[["key_value", "key_type", "start_date", "end_date", "multiplier", "key_norm"]]
 
 def filter_active(contract_df: pd.DataFrame, as_of: date | None = None) -> pd.DataFrame:
 	if as_of is None:
@@ -329,7 +429,7 @@ def apply_contract(
 
 		# 5) default
 		multipliers.append(default_mult)
-		sources.append("DEFAULT:0.50")
+		sources.append(f"DEFAULT:{default_mult:.4f}")
 
 	flat_df["Multiplier"] = multipliers
 	flat_df["Net Price"] = flat_df[list_price_col] * flat_df["Multiplier"]
@@ -606,13 +706,24 @@ if pdf_file is not None:
 	else:
 		st.dataframe(contract_df, use_container_width=True)
 
+		# 🔧 Default multiplier control (shows above the download button)
+		default_mult = st.number_input(
+			"BASE MULTIPLIER: Select Base Multiplier and Press Enter Key to Refresh",
+			min_value=0.0000,
+			max_value=1.0000,
+			value=0.5000,       # auto-populates as 0.5000
+			step=0.0001,
+			format="%.4f",
+			help="This value is used when a part has no matching Part/Sub-Line/Sub-Group/Line contract."
+		)
+
 		# apply to merged pricing data
 		priced_df = apply_contract(
 			flat_merged.copy(),
 			contract_df,
-			default_mult=0.50,
+			default_mult=default_mult,      # 👈 use the UI value
 			list_price_col=list_price_col,
-			)
+		)
 			
 		# 👇 extra polish: make sure these 3 columns are NOT blank in the final sheet
 		priced_df["Sub-Group"] = priced_df["Sub-Group"].fillna(
