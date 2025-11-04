@@ -708,7 +708,7 @@ if pdf_file is not None:
 
 		# 🔧 Default multiplier control (shows above the download button)
 		default_mult = st.number_input(
-			"BASE MULTIPLIER: Select Base Multiplier and Press Enter Key to Refresh",
+			"BASE MULTIPLIER: Select Base Multiplier & Press Enter Key to Refresh",
 			min_value=0.0000,
 			max_value=1.0000,
 			value=0.5000,       # auto-populates as 0.5000
