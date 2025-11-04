@@ -427,9 +427,21 @@ def apply_contract(
 			sources.append(f"LINE:{line}")
 			continue
 
-		# 5) default
-		multipliers.append(default_mult)
-		sources.append(f"DEFAULT:{default_mult:.4f}")
+		# 5) default (guarded for special lines/sub-groups)
+		# If item is in protected buckets, force 0.50; else use the UI default
+		if (line and norm_key(line) == "ADD-A-VALVE") or (subgroup and norm_key(subgroup) == "ACTUATION"):
+			m = 0.50
+			multipliers.append(m)
+			# make the source explicit so it's clear why 0.50 was used
+			reason = []
+			if line and norm_key(line) == "ADD-A-VALVE":
+				reason.append("LINE=ADD-A-VALVE")
+			if subgroup and norm_key(subgroup) == "ACTUATION":
+				reason.append("SUBGROUP=ACTUATION")
+			sources.append("DEFAULT_PROTECTED:" + ",".join(reason))
+		else:
+			multipliers.append(default_mult)
+			sources.append(f"DEFAULT:{default_mult:.4f}")
 
 	flat_df["Multiplier"] = multipliers
 	flat_df["Net Price"] = flat_df[list_price_col] * flat_df["Multiplier"]
@@ -708,7 +720,7 @@ if pdf_file is not None:
 
 		# 🔧 Default multiplier control (shows above the download button)
 		default_mult = st.number_input(
-			"BASE MULTIPLIER: Select Base Multiplier & Press Enter Key to Refresh",
+			"Default multiplier (applied when no contract match):",
 			min_value=0.0000,
 			max_value=1.0000,
 			value=0.5000,       # auto-populates as 0.5000
