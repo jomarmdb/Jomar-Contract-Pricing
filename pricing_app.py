@@ -73,7 +73,7 @@ st.markdown(
 )
 
 BASE_DIR = Path(__file__).parent
-PRODUCTS_PATH = BASE_DIR / "JomarList_10272025.xlsx"  # make sure name matches
+PRODUCTS_PATH = BASE_DIR / "JomarList_Jan2026.xlsx"  # make sure name matches
 FLAT_SHEET_NAME = "Jomar List Pricing"
 GROUP_SHEET_NAME = "Model Group"
 HEADER_ROW_INDEX = 0  # headers start on row 1 in Excel
@@ -764,5 +764,6 @@ if pdf_file is not None:
 			file_name="Jomar List & Net Price Sheet.xlsx",
 			mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 		)
+
 
 
