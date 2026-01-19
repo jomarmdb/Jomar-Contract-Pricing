@@ -640,6 +640,9 @@ if model_part_col is None:
 flat_list["Part_Key"] = flat_list[flat_part_col].apply(norm_key)
 model_group["Part_Key"] = model_group[model_part_col].apply(norm_key)
 
+# ✅ Prevent merge row-multiplication if Model Group has duplicate parts
+model_group = model_group.drop_duplicates(subset=["Part_Key"], keep="last")
+
 # 5) first merge (what we had before)
 flat_merged = flat_list.merge(
 	model_group[["Part_Key", "Sub-Group", "Line", "Sub-Line"]],
@@ -764,6 +767,7 @@ if pdf_file is not None:
 			file_name="Jomar List & Net Price Sheet.xlsx",
 			mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 		)
+
 
 
 
