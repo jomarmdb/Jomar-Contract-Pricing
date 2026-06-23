@@ -184,11 +184,11 @@ def extract_contract_from_pdf(pdf_file) -> pd.DataFrame:
 
     # === Column bands (x0) tuned to ETNA layout ===
     # Product ~ x≈80–190; Code ~ x≈208; Start ~ x≈252; End ~ x≈302; Multi ~ x≈374 (then 'X' at ~421)
-    X_PRODUCT_MAX = 200
-    X_CODE_MIN,  X_CODE_MAX  = 200, 245
-    X_START_MIN, X_START_MAX = 245, 300
-    X_END_MIN,   X_END_MAX   = 300, 360
-    X_MULTI_MIN, X_MULTI_MAX = 360, 420   # stop before the trailing "X" (~421)
+    X_PRODUCT_MAX = 190
+    X_CODE_MIN,  X_CODE_MAX  = 190, 240
+    X_START_MIN, X_START_MAX = 240, 295
+    X_END_MIN,   X_END_MAX   = 295, 365
+    X_MULTI_MIN, X_MULTI_MAX = 365, 420   # stop before the trailing "X" (~421)
 
     def is_date_like(s: str) -> bool:
         if not s:
